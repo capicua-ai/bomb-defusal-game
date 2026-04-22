@@ -261,20 +261,8 @@ export default function BombGame() {
         </p>
       </div>
 
-      {/* ── Bomb body ── */}
-      <div className="relative mb-10">
-        <div className="w-40 h-40 bg-zinc-800 rounded-full border-4 border-zinc-700 flex items-center justify-center shadow-[0_0_80px_rgba(239,68,68,0.2)]">
-          <span className="text-6xl">
-            {gameState === "playing" ? "💣" : gameState === "defused" ? "✅" : "💥"}
-          </span>
-        </div>
-        {gameState === "playing" && (
-          <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-orange-500 animate-ping" />
-        )}
-      </div>
-
       {/* ── Country question ── */}
-      <div className="mb-10 text-center">
+      <div className="mb-6 text-center">
         <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">
           País
         </p>
@@ -284,55 +272,317 @@ export default function BombGame() {
         </p>
       </div>
 
-      {/* ── Cables ── */}
-      <div className="flex gap-8">
-        {round.cables.map((cable, i) => {
+      {/* ── Bomb assembly: detonator → cables → bomb ── */}
+      <BombAssembly
+        cables={round.cables}
+        cutIndex={cutIndex}
+        gameState={gameState}
+        onCut={cutCable}
+      />
+    </div>
+  );
+}
+
+/* ── Bomb assembly (detonator + cables + bomb body) ── */
+function BombAssembly({
+  cables,
+  cutIndex,
+  gameState,
+  onCut,
+}: {
+  cables: CableColor[];
+  cutIndex: number | null;
+  gameState: GameState;
+  onCut: (index: number) => void;
+}) {
+  const width = 360;
+  const height = 280;
+  const detonatorY = 18;
+  const bombY = height - 60;
+  const detonatorWidth = 220;
+  const detonatorX = (width - detonatorWidth) / 2;
+
+  const n = cables.length;
+  // Evenly space cable endpoints along the detonator and the bomb top.
+  const topXs = cables.map(
+    (_, i) =>
+      detonatorX + detonatorWidth * ((i + 1) / (n + 1))
+  );
+  // Bomb top-center area where cables plug in.
+  const bombCenterX = width / 2;
+  const bombPlugSpread = 90;
+  const bottomXs = cables.map(
+    (_, i) =>
+      bombCenterX -
+      bombPlugSpread / 2 +
+      bombPlugSpread * (i / Math.max(n - 1, 1))
+  );
+
+  return (
+    <div className="relative" style={{ width, height }}>
+      <svg
+        width={width}
+        height={height}
+        className="absolute inset-0 overflow-visible"
+      >
+        <defs>
+          {/* Soft shadow under cables */}
+          <filter id="cableShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.5" />
+          </filter>
+        </defs>
+
+        {/* Cables */}
+        {cables.map((cable, i) => {
+          const x1 = topXs[i];
+          const y1 = detonatorY + 22;
+          const x2 = bottomXs[i];
+          const y2 = bombY - 6;
           const isCut = cutIndex === i;
+          // Natural sag: middle control points pulled down.
+          const sag = 40 + Math.abs(x2 - x1) * 0.15;
+          const cx1 = x1;
+          const cy1 = y1 + sag;
+          const cx2 = x2;
+          const cy2 = y2 - sag * 0.3;
+
+          // Cut midpoint — rough bezier midpoint approximation.
+          const mx = (x1 + cx1 + cx2 + x2) / 4;
+          const my = (y1 + cy1 + cy2 + y2) / 4;
+
+          const stroke = cable.hex;
+          const darkBorder =
+            cable.hex === "#FFFFFF" || cable.hex === "#FCD116"
+              ? "#4a4a4a"
+              : cable.hex === "#000000"
+              ? "#222"
+              : "rgba(0,0,0,0.45)";
+
+          const clickable = gameState === "playing";
+
           return (
-            <button
-              key={i}
-              disabled={gameState !== "playing"}
-              onClick={() => cutCable(i)}
-              className="group flex flex-col items-center gap-3 disabled:cursor-default"
-            >
-              <div className="relative">
-                <div
-                  className={`w-7 rounded-full transition-all duration-300
-                    ${
-                      isCut
-                        ? "h-10 opacity-40"
-                        : "h-32 group-hover:h-28 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.15)]"
-                    }
-                    ${gameState === "playing" ? "cursor-pointer" : ""}
-                  `}
-                  style={{
-                    backgroundColor: cable.hex,
-                    border:
-                      cable.hex === "#FFFFFF"
-                        ? "2px solid #555"
-                        : cable.hex === "#000000"
-                        ? "2px solid #444"
-                        : "none",
-                  }}
-                />
-                {isCut && (
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
-                    <span className="text-lg">✂️</span>
-                  </div>
-                )}
-              </div>
-              <span
-                className={`text-sm font-bold tracking-wide uppercase transition-colors ${
-                  gameState === "playing"
-                    ? "text-zinc-400 group-hover:text-white"
-                    : "text-zinc-600"
-                }`}
-              >
-                {cable.label}
-              </span>
-            </button>
+            <g key={i}>
+              {/* Shadow */}
+              <path
+                d={`M ${x1} ${y1 + 3} C ${cx1} ${cy1 + 3}, ${cx2} ${cy2 + 3}, ${x2} ${y2 + 3}`}
+                stroke="rgba(0,0,0,0.5)"
+                strokeWidth={12}
+                fill="none"
+                filter="url(#cableShadow)"
+              />
+
+              {!isCut ? (
+                <>
+                  {/* Outer casing (slightly darker border for contrast) */}
+                  <path
+                    d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
+                    stroke={darkBorder}
+                    strokeWidth={12}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  {/* Cable body */}
+                  <path
+                    d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
+                    stroke={stroke}
+                    strokeWidth={9}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  {/* Glossy highlight */}
+                  <path
+                    d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
+                    stroke="rgba(255,255,255,0.35)"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    fill="none"
+                    strokeDasharray="0 0"
+                    transform="translate(-1 -2)"
+                  />
+                  {/* Invisible thick hit area for easier clicking */}
+                  <path
+                    d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
+                    stroke="transparent"
+                    strokeWidth={26}
+                    fill="none"
+                    style={{ cursor: clickable ? "pointer" : "default" }}
+                    onClick={() => clickable && onCut(i)}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Upper half (hangs from detonator) */}
+                  <path
+                    d={`M ${x1} ${y1} C ${cx1} ${cy1 * 0.75}, ${mx - 10} ${my - 8}, ${mx - 6} ${my - 2}`}
+                    stroke={darkBorder}
+                    strokeWidth={12}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={0.9}
+                  />
+                  <path
+                    d={`M ${x1} ${y1} C ${cx1} ${cy1 * 0.75}, ${mx - 10} ${my - 8}, ${mx - 6} ${my - 2}`}
+                    stroke={stroke}
+                    strokeWidth={9}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={0.95}
+                  />
+                  {/* Lower half (dangling from bomb) */}
+                  <path
+                    d={`M ${x2} ${y2} C ${cx2} ${cy2 + 10}, ${mx + 10} ${my + 14}, ${mx + 6} ${my + 6}`}
+                    stroke={darkBorder}
+                    strokeWidth={12}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={0.9}
+                  />
+                  <path
+                    d={`M ${x2} ${y2} C ${cx2} ${cy2 + 10}, ${mx + 10} ${my + 14}, ${mx + 6} ${my + 6}`}
+                    stroke={stroke}
+                    strokeWidth={9}
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity={0.95}
+                  />
+                  {/* Exposed copper ends */}
+                  <circle cx={mx - 6} cy={my - 2} r={3} fill="#e8a24a" />
+                  <circle cx={mx + 6} cy={my + 6} r={3} fill="#e8a24a" />
+                  {/* Spark */}
+                  <text
+                    x={mx}
+                    y={my + 4}
+                    textAnchor="middle"
+                    fontSize={18}
+                    style={{ pointerEvents: "none" }}
+                  >
+                    ✂️
+                  </text>
+                </>
+              )}
+
+              {/* Screw plug at bomb end */}
+              <circle
+                cx={x2}
+                cy={y2}
+                r={4}
+                fill="#666"
+                stroke="#1a1a1a"
+                strokeWidth={1}
+              />
+              {/* Screw plug at detonator end */}
+              <circle
+                cx={x1}
+                cy={y1}
+                r={4}
+                fill="#888"
+                stroke="#1a1a1a"
+                strokeWidth={1}
+              />
+            </g>
           );
         })}
+      </svg>
+
+      {/* Detonator box (top) */}
+      <div
+        className="absolute flex items-center justify-between px-3 rounded-md border-2 border-zinc-700 shadow-[0_6px_20px_rgba(0,0,0,0.6)]"
+        style={{
+          left: detonatorX,
+          top: detonatorY - 18,
+          width: detonatorWidth,
+          height: 40,
+          background:
+            "linear-gradient(180deg, #3a3a3a 0%, #1f1f1f 55%, #161616 100%)",
+        }}
+      >
+        {/* LED */}
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              gameState === "playing"
+                ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.9)] animate-pulse"
+                : gameState === "defused"
+                ? "bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
+                : "bg-zinc-600"
+            }`}
+          />
+          <span className="text-[9px] font-mono text-zinc-400 tracking-wider">
+            DET-01
+          </span>
+        </div>
+        {/* Fake screws */}
+        <div className="flex items-center gap-2">
+          <Screw />
+          <Screw />
+        </div>
+      </div>
+
+      {/* Bomb body (bottom) */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center"
+        style={{ top: bombY - 10 }}
+      >
+        <div
+          className="relative w-44 h-44 rounded-full border-4 border-zinc-700 flex items-center justify-center shadow-[0_0_60px_rgba(239,68,68,0.25)]"
+          style={{
+            background:
+              "radial-gradient(circle at 30% 30%, #4a4a4a 0%, #232323 45%, #111 100%)",
+          }}
+        >
+          {/* Top plate where cables plug in */}
+          <div
+            className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-sm border border-zinc-800 shadow-inner"
+            style={{
+              width: 110,
+              height: 14,
+              background:
+                "linear-gradient(180deg, #2c2c2c 0%, #121212 100%)",
+            }}
+          />
+          <span className="text-6xl drop-shadow-lg">
+            {gameState === "playing"
+              ? "💣"
+              : gameState === "defused"
+              ? "✅"
+              : "💥"}
+          </span>
+          {gameState === "playing" && (
+            <div className="absolute -right-1 top-4 w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
+          )}
+        </div>
+      </div>
+
+      {/* Labels under each cable plug */}
+      <div
+        className="absolute left-0 right-0 flex"
+        style={{ top: bombY + 140 }}
+      >
+        {cables.map((cable, i) => (
+          <div
+            key={i}
+            className="absolute -translate-x-1/2 text-center"
+            style={{ left: bottomXs[i] }}
+          >
+            <span
+              className={`text-[10px] font-bold tracking-wider uppercase ${
+                gameState === "playing" ? "text-zinc-400" : "text-zinc-600"
+              }`}
+            >
+              {cable.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Screw() {
+  return (
+    <div className="w-2 h-2 rounded-full bg-zinc-500 relative">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-[7px] h-[1px] bg-zinc-800 rotate-45" />
       </div>
     </div>
   );
