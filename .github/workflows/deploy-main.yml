@@ -1,0 +1,16 @@
+name: Deploy main to Vercel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  trigger-vercel-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        run: |
+          curl -fsSL -X POST "$VERCEL_MAIN_HOOK_URL"
+        env:
+          VERCEL_MAIN_HOOK_URL: ${{ secrets.VERCEL_MAIN_HOOK_URL }}
