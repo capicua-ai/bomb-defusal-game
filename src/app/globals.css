@@ -15,3 +15,91 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* ── Cable cutting animations ── */
+@keyframes cable-swing-top {
+  0% { transform: rotate(0deg); }
+  30% { transform: rotate(-4deg); }
+  60% { transform: rotate(3deg); }
+  100% { transform: rotate(-1deg); }
+}
+@keyframes cable-swing-bottom {
+  0% { transform: rotate(0deg); }
+  30% { transform: rotate(5deg); }
+  60% { transform: rotate(-3deg); }
+  100% { transform: rotate(1deg); }
+}
+.cable-swing-top {
+  animation: cable-swing-top 1.6s ease-out both;
+}
+.cable-swing-bottom {
+  animation: cable-swing-bottom 1.6s ease-out both;
+}
+
+/* ── Spark flash (central glow) ── */
+@keyframes spark-flash {
+  0%, 100% { opacity: 0; transform: scale(0.6); }
+  25% { opacity: 1; transform: scale(1.3); }
+  50% { opacity: 0.5; transform: scale(1); }
+  75% { opacity: 1; transform: scale(1.5); }
+}
+.spark-flash {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spark-flash 0.35s ease-out infinite;
+  filter: drop-shadow(0 0 6px #fff28a);
+}
+
+/* ── Spark bolts (quick zig-zag flashes) ── */
+@keyframes spark-bolt {
+  0%, 100% { opacity: 0; }
+  20%, 40% { opacity: 1; }
+}
+.spark-bolt {
+  animation: spark-bolt 0.22s ease-in-out infinite;
+}
+.spark-bolt-2 {
+  animation: spark-bolt 0.18s ease-in-out infinite;
+  animation-delay: 0.09s;
+}
+
+/* ── Spark particles (shooting outward) ── */
+@keyframes spark-p1 {
+  0% { transform: translate(0,0); opacity: 1; }
+  100% { transform: translate(-14px, -10px); opacity: 0; }
+}
+@keyframes spark-p2 {
+  0% { transform: translate(0,0); opacity: 1; }
+  100% { transform: translate(12px, -12px); opacity: 0; }
+}
+@keyframes spark-p3 {
+  0% { transform: translate(0,0); opacity: 1; }
+  100% { transform: translate(-10px, 10px); opacity: 0; }
+}
+@keyframes spark-p4 {
+  0% { transform: translate(0,0); opacity: 1; }
+  100% { transform: translate(13px, 9px); opacity: 0; }
+}
+.spark-p1, .spark-p2, .spark-p3, .spark-p4 {
+  transform-box: fill-box;
+}
+.spark-p1 { animation: spark-p1 0.5s ease-out infinite; }
+.spark-p2 { animation: spark-p2 0.55s ease-out infinite; animation-delay: 0.1s; }
+.spark-p3 { animation: spark-p3 0.45s ease-out infinite; animation-delay: 0.2s; }
+.spark-p4 { animation: spark-p4 0.5s ease-out infinite; animation-delay: 0.05s; }
+
+/* ── Suspense dots ── */
+@keyframes suspense-dots {
+  0%   { content: ""; }
+  25%  { content: "."; }
+  50%  { content: ".."; }
+  75%  { content: "..."; }
+  100% { content: ""; }
+}
+.suspense-dots::after {
+  display: inline-block;
+  width: 1.5em;
+  text-align: left;
+  animation: suspense-dots 1s steps(4, end) infinite;
+  content: "";
+}

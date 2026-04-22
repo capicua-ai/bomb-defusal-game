@@ -109,7 +109,9 @@ function generateRound(): Round {
 }
 
 /* ── Component ─────────────────────── */
-type GameState = "playing" | "defused" | "exploded";
+type GameState = "playing" | "cutting" | "defused" | "exploded";
+
+const SUSPENSE_MS = 2000;
 
 export default function BombGame() {
   const [round, setRound] = useState<Round | null>(null);
@@ -119,8 +121,10 @@ export default function BombGame() {
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const suspenseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startRound = useCallback(() => {
+    if (suspenseRef.current) clearTimeout(suspenseRef.current);
     setRound(generateRound());
     setTimeLeft(10);
     setGameState("playing");
@@ -148,18 +152,28 @@ export default function BombGame() {
     };
   }, [gameState]);
 
+  useEffect(() => {
+    return () => {
+      if (suspenseRef.current) clearTimeout(suspenseRef.current);
+    };
+  }, []);
+
   const cutCable = (index: number) => {
     if (gameState !== "playing" || !round) return;
     setCutIndex(index);
     if (timerRef.current) clearInterval(timerRef.current);
-    if (index === round.correctIndex) {
-      setGameState("defused");
-      setScore((s) => s + 1);
-      setStreak((s) => s + 1);
-    } else {
-      setGameState("exploded");
-      setStreak(0);
-    }
+    setGameState("cutting");
+    const willDefuse = index === round.correctIndex;
+    suspenseRef.current = setTimeout(() => {
+      if (willDefuse) {
+        setGameState("defused");
+        setScore((s) => s + 1);
+        setStreak((s) => s + 1);
+      } else {
+        setGameState("exploded");
+        setStreak(0);
+      }
+    }, SUSPENSE_MS);
   };
 
   if (!round) return null;
@@ -267,9 +281,15 @@ export default function BombGame() {
           País
         </p>
         <p className="text-4xl font-black">{round.country}</p>
-        <p className="text-sm text-zinc-500 mt-2">
-          Cortá el cable del color de su bandera
-        </p>
+        {gameState === "cutting" ? (
+          <p className="text-sm text-amber-400 mt-2 font-bold tracking-wider animate-pulse">
+            Analizando circuito<span className="suspense-dots" />
+          </p>
+        ) : (
+          <p className="text-sm text-zinc-500 mt-2">
+            Cortá el cable del color de su bandera
+          </p>
+        )}
       </div>
 
       {/* ── Bomb assembly: detonator → cables → bomb ── */}
@@ -419,6 +439,12 @@ function BombAssembly({
                     strokeLinecap="round"
                     fill="none"
                     opacity={0.9}
+                    className={gameState === "cutting" ? "cable-swing-top" : ""}
+                    style={
+                      gameState === "cutting"
+                        ? { transformOrigin: `${x1}px ${y1}px` }
+                        : undefined
+                    }
                   />
                   <path
                     d={`M ${x1} ${y1} C ${cx1} ${cy1 * 0.75}, ${mx - 10} ${my - 8}, ${mx - 6} ${my - 2}`}
@@ -427,6 +453,12 @@ function BombAssembly({
                     strokeLinecap="round"
                     fill="none"
                     opacity={0.95}
+                    className={gameState === "cutting" ? "cable-swing-top" : ""}
+                    style={
+                      gameState === "cutting"
+                        ? { transformOrigin: `${x1}px ${y1}px` }
+                        : undefined
+                    }
                   />
                   {/* Lower half (dangling from bomb) */}
                   <path
@@ -436,6 +468,12 @@ function BombAssembly({
                     strokeLinecap="round"
                     fill="none"
                     opacity={0.9}
+                    className={gameState === "cutting" ? "cable-swing-bottom" : ""}
+                    style={
+                      gameState === "cutting"
+                        ? { transformOrigin: `${x2}px ${y2}px` }
+                        : undefined
+                    }
                   />
                   <path
                     d={`M ${x2} ${y2} C ${cx2} ${cy2 + 10}, ${mx + 10} ${my + 14}, ${mx + 6} ${my + 6}`}
@@ -444,20 +482,67 @@ function BombAssembly({
                     strokeLinecap="round"
                     fill="none"
                     opacity={0.95}
+                    className={gameState === "cutting" ? "cable-swing-bottom" : ""}
+                    style={
+                      gameState === "cutting"
+                        ? { transformOrigin: `${x2}px ${y2}px` }
+                        : undefined
+                    }
                   />
                   {/* Exposed copper ends */}
                   <circle cx={mx - 6} cy={my - 2} r={3} fill="#e8a24a" />
                   <circle cx={mx + 6} cy={my + 6} r={3} fill="#e8a24a" />
-                  {/* Spark */}
-                  <text
-                    x={mx}
-                    y={my + 4}
-                    textAnchor="middle"
-                    fontSize={18}
-                    style={{ pointerEvents: "none" }}
-                  >
-                    ✂️
-                  </text>
+
+                  {/* Electric sparks during suspense */}
+                  {gameState === "cutting" && (
+                    <g className="sparks">
+                      <circle
+                        cx={mx}
+                        cy={my + 2}
+                        r={5}
+                        fill="#fffbbf"
+                        className="spark-flash"
+                      />
+                      <line
+                        x1={mx - 4}
+                        y1={my - 1}
+                        x2={mx + 4}
+                        y2={my + 5}
+                        stroke="#ffe14a"
+                        strokeWidth={1.5}
+                        strokeLinecap="round"
+                        className="spark-bolt"
+                      />
+                      <line
+                        x1={mx - 3}
+                        y1={my + 3}
+                        x2={mx + 5}
+                        y2={my - 3}
+                        stroke="#fff"
+                        strokeWidth={1}
+                        strokeLinecap="round"
+                        className="spark-bolt-2"
+                      />
+                      {/* Scattering spark particles */}
+                      <circle cx={mx} cy={my + 2} r={1.5} fill="#ffd24a" className="spark-p1" />
+                      <circle cx={mx} cy={my + 2} r={1.5} fill="#ff9a3c" className="spark-p2" />
+                      <circle cx={mx} cy={my + 2} r={1} fill="#fff2a8" className="spark-p3" />
+                      <circle cx={mx} cy={my + 2} r={1} fill="#ffd24a" className="spark-p4" />
+                    </g>
+                  )}
+
+                  {/* Scissors (only visible briefly at cut moment) */}
+                  {gameState !== "cutting" && (
+                    <text
+                      x={mx}
+                      y={my + 4}
+                      textAnchor="middle"
+                      fontSize={18}
+                      style={{ pointerEvents: "none" }}
+                    >
+                      ✂️
+                    </text>
+                  )}
                 </>
               )}
 
